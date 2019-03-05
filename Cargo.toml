@@ -1,0 +1,7 @@
+[package]
+name = "labo"
+version = "0.1.0"
+authors = ["Marvin <m.gazibaric@live.de>"]
+edition = "2018"
+
+[dependencies]
