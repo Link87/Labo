@@ -1,7 +1,11 @@
 [package]
 name = "labo"
 version = "0.1.0"
-authors = ["Marvin <m.gazibaric@live.de>"]
+authors = ["Marvin Gazibarić <m.gazibaric@live.de>"]
 edition = "2018"
+publish = false
 
 [dependencies]
+telegram-bot-fork = "0.7.7"
+tokio = "0.1.16"
+futures = "0.1.25"
