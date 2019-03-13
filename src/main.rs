@@ -5,14 +5,17 @@ extern crate tokio;
 use futures::{Stream, future::lazy};
 use telegram_bot_fork::*;
 use tokio::runtime::current_thread::Runtime;
-use std::env;
 
 use labo;
 
 fn main() {
+    let config = match labo::Config::new() {
+        Ok(config) => config,
+        Err(e) => panic!(e),
+    };
+
     Runtime::new().unwrap().block_on(lazy(|| {
-        let token = env::var("TELEGRAM_BOT_TOKEN").unwrap();
-        let api = Api::new(token).unwrap();
+        let api = Api::new(config.api_token).unwrap();
 
         // Convert stream to the stream with errors in result
         let stream = api.stream().then(|mb_update| {
