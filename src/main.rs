@@ -1,3 +1,5 @@
+use labo;
+
 fn main() {
-    println!("Hello, world!");
+    labo::run_bot();
 }
