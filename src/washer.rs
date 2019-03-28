@@ -1,4 +1,9 @@
+use futures::unsync::oneshot::Sender;
+
+use std::mem;
 use std::time::{Duration, Instant};
+
+use crate::timer::Timer;
 
 /// A washer implemented as a state machine.
 #[derive(Debug)]
@@ -12,47 +17,58 @@ pub enum WasherState {
     Running {
         program: Program,
         start_time: Instant,
+        cancel_timer: Sender<()>,
     },
     Finished,
     Idle,
 }
 
 impl Washer {
-    /// Create a new `Washer` in the `WasherState::Idle` state.
+    /// Creates a new `Washer` in the `WasherState::Idle` state.
     pub fn new() -> Washer {
         Washer { state: WasherState::Idle }
     }
 
-    /// Start the `Washer`, changing its `state` to `WasherState::Running`. 
-    /// Start time will be set to current time.
+    /// Starts the `Washer`, changing its `state` to `WasherState::Running`. 
+    /// Start time will be set to current time and a `Timer` will be created.
     /// 
     /// # Panics
     /// When `state` is not `WasherState::Idle`.
-    pub fn start(&mut self, program: Program) {
+    pub fn start(&mut self, program: &Program) -> Timer {
+        let now = Instant::now();
+        let (timer, cancel_timer) = Timer::new(now + program.duration);
         match self.state {
             WasherState::Idle => self.state = WasherState::Running {
-                program,
-                start_time: Instant::now(),
+                program: program.clone(),
+                start_time: now,
+                cancel_timer,
             },
             _ => panic!("Can call start on an 'Idle' Washer only"),
         }
+        timer
     }
 
-    /// Stop the `Washer` immediately, changing its `state` to
+    /// Stops the `Washer` prematurely, changing its `state` to
     /// `WasherState::Idle`.
-    /// Call this when the washer program was prematurely aborted.
     /// 
     /// # Panics
     /// When `state` is not `WasherState::Running`
     pub fn stop(&mut self) {
-        match self.state {
-            WasherState::Running { .. } => self.state = WasherState::Idle,
+        let state = mem::replace(&mut self.state, WasherState::Idle);
+        match state {
+            WasherState::Running { cancel_timer, .. } => {
+                if let Err(_) = cancel_timer.send(()) {
+                    eprintln!{"Receiver was dropped."};
+                }
+                self.state = WasherState::Idle
+            },
             _ => panic!("Can call stop on a 'Running' Washer only"),
         }
     }
 
-    /// Stop the `Washer` when time is up. `state` is changed to
+    /// Stops the `Washer`. `state` is changed to
     /// `WasherState::Finished`.
+    /// Call this when time was up.
     ///
     /// # Panics
     /// When `state` is not `WasherState::Running`
@@ -87,10 +103,14 @@ impl Washer {
             _ => panic!("Can call empty on a 'Finished' Washer only"),
         }
     }
+
+    pub fn state(&self) -> &WasherState {
+        &self.state
+    }
 }
 
 /// A program a washer can execute.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program {
     name: String,
     duration: Duration,
