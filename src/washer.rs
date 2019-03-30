@@ -1,4 +1,5 @@
 use futures::unsync::oneshot::Sender;
+use telegram_bot_fork::UserId;
 
 use std::mem;
 use std::time::{Duration, Instant};
@@ -18,6 +19,7 @@ pub enum WasherState {
         program: Program,
         start_time: Instant,
         cancel_timer: Sender<()>,
+        user: UserId,
     },
     Finished,
     Idle,
@@ -34,7 +36,7 @@ impl Washer {
     /// 
     /// # Panics
     /// When `state` is not `WasherState::Idle`.
-    pub fn start(&mut self, program: &Program) -> Timer {
+    pub fn start(&mut self, program: &Program, user: UserId) -> Timer {
         let now = Instant::now();
         let (timer, cancel_timer) = Timer::new(now + program.duration);
         match self.state {
@@ -42,6 +44,7 @@ impl Washer {
                 program: program.clone(),
                 start_time: now,
                 cancel_timer,
+                user,
             },
             _ => panic!("Can call start on an 'Idle' Washer only"),
         }
@@ -79,14 +82,16 @@ impl Washer {
         }
     }
 
-    /// Return remaining time.
+    /// Return remaining time or `None` when timer has finished.
     ///
     /// # Panics
     /// When `state` is not `WasherState::Running`
-    pub fn remaining_time(&self) -> Duration {
+    pub fn remaining_time(&self) -> Option<Duration> {
         match &self.state {
-            WasherState::Running { start_time, .. } => 
-                    Instant::now() - *start_time,
+            WasherState::Running { cancel_timer, .. }
+                    if cancel_timer.is_canceled() =>  None,
+            WasherState::Running { start_time, program, .. } => 
+                    Some(Instant::now() - *start_time + program.duration),
             _ => panic!("Can get time of a 'Running' Washer only"),
         }
         
@@ -104,6 +109,7 @@ impl Washer {
         }
     }
 
+    /// Returns the `WasherState` the `Washer` is in.
     pub fn state(&self) -> &WasherState {
         &self.state
     }
