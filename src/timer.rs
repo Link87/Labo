@@ -1,5 +1,5 @@
-use futures::{Future, Async, Poll};
-use futures::unsync::oneshot::{self, Sender, Receiver};
+use futures::unsync::oneshot::{self, Receiver, Sender};
+use futures::{Async, Future, Poll};
 use tokio::timer::{Delay, Error};
 
 use std::time::Instant;
@@ -18,7 +18,13 @@ impl Timer {
     /// Returns a new `Timer` instance and a `Sender` to cancel the timer.
     pub fn new(finish_at: Instant) -> (Timer, Sender<()>) {
         let (tx, rx) = oneshot::channel();
-        (Timer { delay: Delay::new(finish_at), cancel: rx }, tx)
+        (
+            Timer {
+                delay: Delay::new(finish_at),
+                cancel: rx,
+            },
+            tx,
+        )
     }
 }
 
@@ -29,7 +35,7 @@ impl Future for Timer {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         match self.cancel.poll() {
             Ok(Async::Ready(())) => return Ok(Async::Ready(false)),
-            Ok(Async::NotReady) => {},
+            Ok(Async::NotReady) => {}
             Err(e) => eprintln!("Sender was droppped: {}", e),
         }
         match self.delay.poll() {

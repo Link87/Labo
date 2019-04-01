@@ -28,24 +28,28 @@ pub enum WasherState {
 impl Washer {
     /// Creates a new `Washer` in the `WasherState::Idle` state.
     pub fn new() -> Washer {
-        Washer { state: WasherState::Idle }
+        Washer {
+            state: WasherState::Idle,
+        }
     }
 
-    /// Starts the `Washer`, changing its `state` to `WasherState::Running`. 
+    /// Starts the `Washer`, changing its `state` to `WasherState::Running`.
     /// Start time will be set to current time and a `Timer` will be created.
-    /// 
+    ///
     /// # Panics
     /// When `state` is not `WasherState::Idle`.
     pub fn start(&mut self, program: &Program, user: UserId) -> Timer {
         let now = Instant::now();
         let (timer, cancel_timer) = Timer::new(now + program.duration);
         match self.state {
-            WasherState::Idle => self.state = WasherState::Running {
-                program: program.clone(),
-                start_time: now,
-                cancel_timer,
-                user,
-            },
+            WasherState::Idle => {
+                self.state = WasherState::Running {
+                    program: program.clone(),
+                    start_time: now,
+                    cancel_timer,
+                    user,
+                }
+            }
             _ => panic!("Can call start on an 'Idle' Washer only"),
         }
         timer
@@ -53,18 +57,18 @@ impl Washer {
 
     /// Stops the `Washer` prematurely, changing its `state` to
     /// `WasherState::Idle`.
-    /// 
+    ///
     /// # Panics
     /// When `state` is not `WasherState::Running`
     pub fn stop(&mut self) {
         let state = mem::replace(&mut self.state, WasherState::Idle);
         match state {
             WasherState::Running { cancel_timer, .. } => {
-                if let Err(_) = cancel_timer.send(()) {
-                    eprintln!{"Receiver was dropped."};
+                if cancel_timer.send(()).is_err() {
+                    eprintln! {"Receiver was dropped."};
                 }
                 self.state = WasherState::Idle
-            },
+            }
             _ => panic!("Can call stop on a 'Running' Washer only"),
         }
     }
@@ -82,22 +86,23 @@ impl Washer {
         }
     }
 
-    /// Return remaining time or `None` when timer has finished.
+    /// Returns remaining time or `None` when timer has finished.
     ///
     /// # Panics
     /// When `state` is not `WasherState::Running`
     pub fn remaining_time(&self) -> Option<Duration> {
         match &self.state {
-            WasherState::Running { cancel_timer, .. }
-                    if cancel_timer.is_canceled() =>  None,
-            WasherState::Running { start_time, program, .. } => 
-                    Some(Instant::now() - *start_time + program.duration),
+            WasherState::Running { cancel_timer, .. } if cancel_timer.is_canceled() => None,
+            WasherState::Running {
+                start_time,
+                program,
+                ..
+            } => Some(*start_time + program.duration - Instant::now()),
             _ => panic!("Can get time of a 'Running' Washer only"),
         }
-        
     }
 
-    /// Change `state` to `WasherState::Idle`. To be called when Washer
+    /// Changes `state` to `WasherState::Idle`. To be called when the washer
     /// was emptied.
     ///
     /// # Panics
@@ -125,9 +130,6 @@ pub struct Program {
 impl Program {
     /// Creates a new `Program`.
     pub fn new(name: String, duration: Duration) -> Program {
-        Program {
-            name,
-            duration,
-        }
+        Program { name, duration }
     }
 }
